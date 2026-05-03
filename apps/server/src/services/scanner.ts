@@ -7,7 +7,8 @@ import { isImageName } from "../lib/natural-sort";
 
 async function isFolderComic(dir: string): Promise<boolean> {
   try {
-    return (await collectFolderImages(dir)).length > 0;
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    return entries.some((e) => e.isFile() && isImageName(e.name));
   } catch {
     return false;
   }
