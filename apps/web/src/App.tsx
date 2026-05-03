@@ -39,6 +39,10 @@ export function App() {
   useEffect(() => {
     if (!settings) return;
     if (!settings.hasOnboarded && !isWelcome) {
+      if (settings.userName.trim() || settings.userLastName?.trim() || settings.avatar) {
+        void useSettingsStore.getState().update({ hasOnboarded: true });
+        return;
+      }
       navigate("/welcome", { replace: true });
     }
   }, [settings, isWelcome, navigate]);
@@ -97,6 +101,10 @@ export function App() {
     const iv = setInterval(() => void fetchOnce(), 20_000);
     return () => { cancelled = true; clearInterval(iv); };
   }, [knownAchievements, push, settings?.hasOnboarded]);
+
+  if (isWelcome && settings?.hasOnboarded) {
+    return <Navigate to="/" replace />;
+  }
 
   if (isWelcome) {
     return (

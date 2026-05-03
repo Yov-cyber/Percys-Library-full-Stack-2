@@ -1,29 +1,58 @@
 import { Router } from "express";
 import path from "node:path";
 import fs from "node:fs";
+import fsp from "node:fs/promises";
 import multer from "multer";
 import { prisma } from "../db";
 import { config } from "../config";
 import { scanLibrary, registerComicPath } from "../services/scanner";
-import { detectFormat } from "../services/pipeline";
+import { detectFormat, type ComicFormat } from "../services/pipeline";
 import { asyncHandler } from "../lib/async-handler";
 import { getOwnerId } from "../lib/owner";
+import { isImageName } from "../lib/natural-sort";
 
 export const libraryRouter = Router();
 
-// Allow CBZ/CBR/PDF uploads only; everything else is rejected at the
-// middleware level so we never write rogue files into the library.
 const ALLOWED_EXT = new Set([".cbz", ".cbr", ".pdf", ".zip", ".rar"]);
+const ALLOWED_IMAGE_EXT = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".bmp",
+  ".avif",
+  ".heic",
+  ".heif",
+  ".tif",
+  ".tiff",
+]);
 // 2 GB hard cap per file. Realistic comic archives sit well below this; we
 // still bound it to avoid accidental DoS via a single huge upload.
 const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+const IMAGE_EXT_PATTERN = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?)$/i;
+const COMIC_EXT_PATTERN = /\.(cbz|cbr|pdf|zip|rar|jpe?g|png|webp|gif|bmp|avif|heic|heif|tiff?)$/i;
+
 function normalizeTitle(input: string): string {
   return input
     .toLowerCase()
-    .replace(/\.(cbz|cbr|pdf|zip|rar)$/i, "")
+    .replace(COMIC_EXT_PATTERN, "")
     .replace(/-\w{4,}$/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+async function fileSignature(filePath: string): Promise<string> {
+  const stat = await fsp.stat(filePath);
+  const handle = await fsp.open(filePath, "r");
+  try {
+    const length = Math.min(64 * 1024, Number(stat.size));
+    const buf = Buffer.alloc(length);
+    await handle.read(buf, 0, length, 0);
+    return `${stat.size}:${buf.toString("base64")}`;
+  } finally {
+    await handle.close();
+  }
 }
 
 const upload = multer({
@@ -36,13 +65,13 @@ const upload = multer({
       cb(null, dir);
     },
     filename: (_req, file, cb) => {
-      // Preserve the original name but make it filesystem-safe and
-      // unique within the upload dir to avoid collisions.
+      const original = Buffer.from(file.originalname, "latin1").toString("utf8");
+      file.originalname = original;
+      const ext = path.extname(original).toLowerCase();
       const base = path
-        .basename(file.originalname)
+        .basename(original)
         .replace(/[\\/:*?"<>|]/g, "_")
         .slice(0, 200);
-      const ext = path.extname(base).toLowerCase();
       const stem = path.basename(base, ext);
       const stamp = Date.now().toString(36);
       cb(null, `${stem}-${stamp}${ext}`);
@@ -51,7 +80,7 @@ const upload = multer({
   limits: { fileSize: MAX_UPLOAD_BYTES },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
-    if (!ALLOWED_EXT.has(ext)) {
+    if (!ALLOWED_EXT.has(ext) && !ALLOWED_IMAGE_EXT.has(ext)) {
       return cb(new Error(`Formato no soportado: ${ext || "(sin extensión)"}`));
     }
     cb(null, true);
@@ -130,10 +159,21 @@ libraryRouter.post(
 
     const existing = await prisma.comic.findMany({
       where: { ownerId },
-      select: { title: true },
+      select: { title: true, path: true, sizeBytes: true },
     });
     const existingTitles = new Set(existing.map((c) => normalizeTitle(c.title)));
+    const existingSignatures = new Set<string>();
+    for (const comic of existing) {
+      try {
+        if (Number(comic.sizeBytes) > 0) {
+          existingSignatures.add(await fileSignature(comic.path));
+        }
+      } catch {
+        // ignore stale or inaccessible files; the scanner reconciles them
+      }
+    }
     const seenBatch = new Set<string>();
+    const seenSignatures = new Set<string>();
     const accepted: Express.Multer.File[] = [];
     const skipped: { name: string; reason: "already-exists" | "duplicated-in-batch" }[] = [];
 
@@ -153,7 +193,24 @@ libraryRouter.post(
         void fs.promises.unlink(file.path).catch(() => undefined);
         continue;
       }
+      let sig = "";
+      try {
+        sig = await fileSignature(file.path);
+      } catch {
+        sig = "";
+      }
+      if (sig && existingSignatures.has(sig)) {
+        skipped.push({ name: file.originalname, reason: "already-exists" });
+        void fs.promises.unlink(file.path).catch(() => undefined);
+        continue;
+      }
+      if (sig && seenSignatures.has(sig)) {
+        skipped.push({ name: file.originalname, reason: "duplicated-in-batch" });
+        void fs.promises.unlink(file.path).catch(() => undefined);
+        continue;
+      }
       seenBatch.add(key);
+      if (sig) seenSignatures.add(sig);
       accepted.push(file);
     }
 
@@ -165,22 +222,61 @@ libraryRouter.post(
     //      "old comics come back when I import a new one".
     //   2. It's much faster: parsing N new files instead of every file
     //      that has ever been uploaded.
-    let added = 0;
+    const imageGroups = new Map<string, Express.Multer.File[]>();
+    const archives: Express.Multer.File[] = [];
     for (const file of accepted) {
+      if (isImageName(file.originalname)) {
+        const group = path.dirname(file.originalname);
+        imageGroups.set(group, [...(imageGroups.get(group) ?? []), file]);
+      } else {
+        archives.push(file);
+      }
+    }
+
+    const sources: { sourcePath: string; fmt: ComicFormat; files: Express.Multer.File[] }[] = [];
+    for (const file of archives) {
       const fmt = detectFormat(file.path, false);
-      if (!fmt) continue;
+      if (!fmt) {
+        void fs.promises.unlink(file.path).catch(() => undefined);
+        continue;
+      }
+      sources.push({ sourcePath: file.path, fmt, files: [file] });
+    }
+    for (const [group, groupFiles] of imageGroups) {
+      const seedName = group === "." ? groupFiles[0]?.originalname ?? "comic" : group;
+      const title = path.basename(seedName).replace(IMAGE_EXT_PATTERN, "") || "comic";
+      const dir = path.join(config.libraryPath, "_uploads", `${title.replace(/[\\/:*?"<>|]/g, "_").slice(0, 120)}-${Date.now().toString(36)}`);
+      await fsp.mkdir(dir, { recursive: true });
+      for (const file of groupFiles) {
+        await fsp.rename(file.path, path.join(dir, path.basename(file.originalname).replace(/[\\/:*?"<>|]/g, "_")));
+      }
+      sources.push({ sourcePath: dir, fmt: "folder", files: groupFiles });
+    }
+
+    let added = 0;
+    const uploadedNames = new Set<string>();
+    for (const source of sources) {
       try {
-        const result = await registerComicPath(ownerId, file.path, fmt);
+        const result = await registerComicPath(ownerId, source.sourcePath, source.fmt);
         if (result === "added") added += 1;
+        if (result !== "skipped") {
+          for (const file of source.files) uploadedNames.add(file.originalname);
+        }
+        if (result === "skipped") {
+          void fs.promises.rm(source.sourcePath, { recursive: true, force: true }).catch(() => undefined);
+        }
       } catch (err) {
         // Best-effort: skip the file but keep going so one bad upload
         // doesn't sink the whole batch.
-        console.error("Failed to register uploaded comic", file.path, err);
+        console.error("Failed to register uploaded comic", source.sourcePath, err);
+        void fs.promises.rm(source.sourcePath, { recursive: true, force: true }).catch(() => undefined);
       }
     }
     const total = await prisma.comic.count({ where: { ownerId } });
     res.json({
-      uploaded: accepted.map((f) => ({ name: f.originalname, size: f.size })),
+      uploaded: accepted
+        .filter((f) => uploadedNames.has(f.originalname))
+        .map((f) => ({ name: f.originalname, size: f.size })),
       skipped,
       added,
       removed: 0,

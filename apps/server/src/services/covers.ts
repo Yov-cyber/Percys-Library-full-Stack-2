@@ -5,7 +5,7 @@ import { config } from "../config";
 import { cache } from "./cache";
 import { getExtractor, type ComicFormat } from "./pipeline";
 import { folderExtractor } from "./extractors/folder";
-import { makeThumbnail } from "../lib/image-utils";
+import { makeThumbnail, normalizeImage } from "../lib/image-utils";
 import { isImageName, naturalCompare } from "../lib/natural-sort";
 
 async function findFolderCover(dir: string): Promise<Buffer | null> {
@@ -24,8 +24,16 @@ async function findFolderCover(dir: string): Promise<Buffer | null> {
 }
 
 function looksValidCover(buf: Buffer): boolean {
-  // Heuristic: very small images (< 6 KB) are usually credits/blanks.
-  return buf.length > 6 * 1024;
+  return buf.length > 0;
+}
+
+async function normalizeCoverCandidate(buf: Buffer): Promise<Buffer | null> {
+  try {
+    const image = await normalizeImage(buf);
+    return image.data;
+  } catch {
+    return null;
+  }
 }
 
 export async function getCover(comicId: string): Promise<Buffer | null> {
@@ -43,8 +51,8 @@ export async function getCover(comicId: string): Promise<Buffer | null> {
     const max = Math.min(comic.pageCount, 4);
     for (let i = 0; i < max; i++) {
       try {
-        const candidate = await extractor.page(comic.path, i);
-        if (looksValidCover(candidate)) {
+        const candidate = await normalizeCoverCandidate(await extractor.page(comic.path, i));
+        if (candidate && looksValidCover(candidate)) {
           raw = candidate;
           break;
         }
@@ -61,6 +69,9 @@ export async function getCover(comicId: string): Promise<Buffer | null> {
     }
   }
 
+  if (raw) {
+    raw = await normalizeCoverCandidate(raw);
+  }
   if (!raw) return null;
 
   let thumb: Buffer;

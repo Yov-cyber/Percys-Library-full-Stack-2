@@ -27,6 +27,11 @@ export function Stats() {
   const goal = useSettingsStore((s) => s.settings?.dailyGoalPages ?? 0);
   const range = useSettingsStore((s) => (s.settings?.statsRange ?? "30d") as Range);
   const updateSettings = useSettingsStore((s) => s.update);
+  const [goalDraft, setGoalDraft] = useState(goal);
+
+  useEffect(() => {
+    setGoalDraft(goal);
+  }, [goal]);
 
   useEffect(() => {
     void api.stats().then(setStats);
@@ -75,6 +80,11 @@ export function Stats() {
                   <Mini label="Mejor día" value={`${stats.bestDayPages}`} sub="pág" />
                 </div>
               )}
+              <DailyGoalEditor
+                value={goalDraft}
+                onChange={setGoalDraft}
+                onSave={() => void updateSettings({ dailyGoalPages: goalDraft })}
+              />
             </div>
           </div>
 
@@ -255,6 +265,59 @@ function RangePicker({
       ))}
     </div>
   );
+}
+
+function DailyGoalEditor({
+  value,
+  onChange,
+  onSave,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+  onSave: () => void;
+}) {
+  const quick = [15, 30, 50, 80, 120];
+  return (
+    <div className="mt-5 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-black uppercase tracking-widest text-slate-500">
+            Configurar meta
+          </div>
+          <div className="text-sm font-semibold text-slate-300">
+            {value > 0 ? `${value} páginas por día` : "Meta desactivada"}
+          </div>
+        </div>
+        <button type="button" onClick={onSave} className="pl-btn-primary px-4 py-2 text-xs">
+          Guardar
+        </button>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={200}
+        step={5}
+        value={value}
+        onChange={(e) => onChange(clampGoal(parseInt(e.target.value, 10)))}
+        className="w-full accent-blue-500"
+      />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" onClick={() => onChange(0)} className="pl-pill">
+          Off
+        </button>
+        {quick.map((n) => (
+          <button key={n} type="button" onClick={() => onChange(n)} className="pl-pill">
+            {n} pág
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function clampGoal(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(2000, value));
 }
 
 function Section({

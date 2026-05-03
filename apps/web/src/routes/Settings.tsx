@@ -29,7 +29,7 @@ const ACCENT_PALETTE = [
 ];
 
 const SECTIONS: { id: string; label: string; hint: string; icon: string }[] = [
-  { id: "profile", label: "Perfil", hint: "Avatar, nombre y bienvenida", icon: "👤" },
+  { id: "profile", label: "Perfil", hint: "Avatar y nombre", icon: "👤" },
   { id: "appearance", label: "Apariencia", hint: "Tema, acento y tipografía", icon: "🎨" },
   { id: "animations", label: "Animaciones", hint: "Movimiento y transiciones", icon: "✨" },
   { id: "library", label: "Biblioteca", hint: "Vista, orden y portadas", icon: "📚" },
@@ -436,25 +436,6 @@ export function Settings() {
                     maxLength={40}
                     className="w-full rounded-xl bg-white/[0.03] border border-white/10 px-4 py-3 text-sm text-white focus:outline-none focus:border-blue-500/50 transition-all shadow-inner"
                   />
-                </Field>
-
-                <Field label="Pantalla de bienvenida">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        await update({ hasOnboarded: false });
-                        push("Te llevaremos a la bienvenida en un momento", "info");
-                        setTimeout(() => navigate("/welcome", { replace: true }), 250);
-                      }}
-                      className="pl-btn text-xs"
-                    >
-                      Volver a verla
-                    </button>
-                    <span className="text-xs text-slate-500">
-                      Vuelve a abrir la bienvenida sin perder tu biblioteca.
-                    </span>
-                  </div>
                 </Field>
               </div>
               {manualMode && (
@@ -1266,7 +1247,7 @@ export function Settings() {
                     Borrar perfil + biblioteca + progresos
                   </button>
                   <p className="text-[10px] text-red-300/70 font-bold uppercase tracking-widest mt-2">
-                    Acción irreversible. Te llevará a la pantalla de bienvenida.
+                    Acción irreversible. El perfil se inicia de cero.
                   </p>
                 </Field>
               </div>
@@ -1381,7 +1362,7 @@ export function Settings() {
             <p className="mt-2 text-sm text-slate-300">
               Esta acción <strong className="text-red-300">elimina todos tus cómics, marcadores,
               días de lectura y logros</strong>, además de borrar tu nombre, avatar y
-              configuración personalizada. Volverás a la pantalla de bienvenida.
+              configuración personalizada. Esta opción inicia un perfil nuevo desde cero.
             </p>
             <p className="mt-3 text-xs text-slate-400">No se puede deshacer.</p>
             <div className="mt-5 flex justify-end gap-2">
@@ -1395,7 +1376,7 @@ export function Settings() {
                     await update({});
                     setWipeConfirmOpen(false);
                     push("Perfil y biblioteca borrados", "success");
-                    setTimeout(() => navigate("/welcome", { replace: true }), 250);
+                    setTimeout(() => navigate("/", { replace: true }), 250);
                   } catch {
                     push("No se pudo borrar el perfil", "error");
                   }

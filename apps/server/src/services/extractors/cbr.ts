@@ -17,7 +17,7 @@ async function getRarMetadata(filePath: string) {
     const extractor = await createExtractorFromData({ data });
     const list = extractor.getFileList();
     const files = Array.from(list.fileHeaders)
-      .filter((f: any) => !f.flags.directory && !f.flags.encrypted && isImageName(f.name))
+      .filter((f: any) => !f.flags.directory && !f.flags.encrypted && !String(f.name).startsWith("__MACOSX/") && isImageName(f.name))
       .sort((a: any, b: any) => naturalCompare(a.name, b.name))
       .map((f: any) => ({ name: f.name }));
 
@@ -30,7 +30,7 @@ async function getRarMetadata(filePath: string) {
         const zip = new AdmZip(buf);
         const entries = zip.getEntries();
         const files = entries
-          .filter((e) => !e.isDirectory && isImageName(e.entryName))
+          .filter((e) => !e.isDirectory && !e.entryName.startsWith("__MACOSX/") && isImageName(e.entryName))
           .sort((a, b) => naturalCompare(a.entryName, b.entryName))
           .map((e) => ({ name: e.entryName }));
         archiveCache.set(cacheKey, files);

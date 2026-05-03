@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { cache } from "./cache";
 import { getExtractor, type ComicFormat } from "./pipeline";
-import { autoCropWhiteMargins, detectMime, makeThumbnail, recompressForQuality } from "../lib/image-utils";
+import { autoCropWhiteMargins, detectMime, makeThumbnail, normalizeImage, recompressForQuality } from "../lib/image-utils";
 import { config } from "../config";
 
 export interface PageBlob {
@@ -38,6 +38,8 @@ export async function getPage(
   let buf: Buffer;
   try {
     buf = await extractor.page(comic.path, index);
+    const normalized = await normalizeImage(buf);
+    buf = normalized.data;
   } catch {
     return null;
   }

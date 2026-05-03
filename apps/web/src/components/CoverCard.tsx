@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { ComicSummary } from "../lib/api";
 import { api } from "../lib/api";
@@ -29,25 +30,57 @@ export function CoverCard({
   selected = false,
   onToggleSelect,
 }: Props) {
+  const [coverState, setCoverState] = useState<"loading" | "ready" | "error">("loading");
+  const [retry, setRetry] = useState(0);
   const progress = comic.pageCount > 0 ? Math.round((comic.currentPage / Math.max(1, comic.pageCount - 1)) * 100) : 0;
+  const coverUrl = `${api.coverUrl(comic.id)}?v=${encodeURIComponent(comic.updatedAt)}${retry > 0 ? `&retry=${retry}` : ""}`;
 
   const coverInner = (
     <>
       <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
         <span className="text-3xl">📚</span>
       </div>
+      {coverState !== "ready" && (
+        <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] via-white/[0.02] to-transparent">
+          <div className="absolute inset-x-5 bottom-5 h-1.5 overflow-hidden rounded-full bg-white/10">
+            <div
+              className={clsx(
+                "h-full rounded-full bg-blue-500/70",
+                coverState === "loading" ? "w-2/3 animate-pulse" : "w-full bg-amber-400/70",
+              )}
+            />
+          </div>
+        </div>
+      )}
       <img
-        src={api.coverUrl(comic.id)}
+        src={coverUrl}
         alt={comic.title}
         loading="lazy"
-        className="h-full w-full object-cover"
+        decoding="async"
+        className={clsx(
+          "h-full w-full object-cover transition-opacity duration-300",
+          coverState === "ready" ? "opacity-100" : "opacity-0",
+        )}
         onError={(e) => {
-          (e.currentTarget as HTMLImageElement).style.opacity = "0";
+          if (retry < 2) {
+            window.setTimeout(() => setRetry((n) => n + 1), 350 * (retry + 1));
+            return;
+          }
+          (e.currentTarget as HTMLImageElement).removeAttribute("src");
+          setCoverState("error");
         }}
         onLoad={(e) => {
-          (e.currentTarget as HTMLImageElement).style.opacity = "1";
+          if ((e.currentTarget as HTMLImageElement).naturalWidth > 0) {
+            setCoverState("ready");
+          }
         }}
       />
+      {coverState === "error" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/70 p-4 text-center">
+          <div className="text-3xl">📚</div>
+          <div className="line-clamp-3 text-xs font-bold text-slate-200">{comic.title}</div>
+        </div>
+      )}
       {comic.completed && (
         <div className="absolute top-2 left-2 rounded-md bg-emerald-500/90 px-2 py-0.5 text-xs font-medium text-white">
           Leído

@@ -188,7 +188,10 @@ export const api = {
   uploadComics: async (files: File[]) => {
     try {
       const fd = new FormData();
-      for (const f of files) fd.append("files", f, f.name);
+      for (const f of files) {
+        const name = (f as File & { webkitRelativePath?: string }).webkitRelativePath || f.name;
+        fd.append("files", f, name);
+      }
       const r = await fetch("/api/library/upload", { method: "POST", body: fd, headers: { "x-owner-id": getOwnerId() } });
       if (!r.ok) {
         const body = (await r.json().catch(() => ({}))) as { error?: string };

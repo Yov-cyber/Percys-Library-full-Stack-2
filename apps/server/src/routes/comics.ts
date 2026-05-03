@@ -198,7 +198,7 @@ comicsRouter.get(
     const buf = await getCover(req.params.id);
     if (!buf) return res.status(404).end();
     res.setHeader("Content-Type", "image/webp");
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
     res.end(buf);
   }),
 );
@@ -234,7 +234,7 @@ comicsRouter.get(
     res.setHeader("Content-Type", page.mime);
     // The crop variant + quality are encoded in the URL query, so the
     // browser cache will naturally key separately for each combination.
-    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=3600");
     res.end(page.data);
   }),
 );
@@ -247,7 +247,7 @@ comicsRouter.get(
     const buf = await getThumb(req.params.id, n);
     if (!buf) return res.status(404).end();
     res.setHeader("Content-Type", "image/webp");
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
     res.end(buf);
   }),
 );
