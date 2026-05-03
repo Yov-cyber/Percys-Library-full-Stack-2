@@ -114,10 +114,9 @@ async function runScan(ownerId: string): Promise<ScanResult> {
   }
 
   async function register(p: string, fmt: ComicFormat): Promise<boolean> {
-    const canonicalPath = await fs.realpath(p).catch(() => path.resolve(p));
-    const result = await registerComicPath(ownerId, canonicalPath, fmt);
+    const result = await registerComicPath(ownerId, p, fmt);
     if (result === "added") added += 1;
-    if (result !== "skipped") seen.add(canonicalPath);
+    if (result !== "skipped") seen.add(p);
     return result !== "skipped";
   }
 
