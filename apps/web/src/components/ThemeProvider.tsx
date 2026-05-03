@@ -325,7 +325,7 @@ export function applyCachedTheme() {
       getTheme("dark");
     applyTheme(theme, settings.accentColor ?? theme.accent);
     const root = document.documentElement;
-    root.setAttribute("data-anim", settings.animationsEnabled ?? true ? "1" : "0");
+    root.setAttribute("data-anim", (settings.animationsEnabled ?? true) ? "1" : "0");
     root.setAttribute("data-reduce-motion", settings.reduceMotion ? "1" : "0");
     const fontScale = Math.max(80, Math.min(130, settings.fontScale ?? 100));
     root.style.setProperty("font-size", `${fontScale}%`);
