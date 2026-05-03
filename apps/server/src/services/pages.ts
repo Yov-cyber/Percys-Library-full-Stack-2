@@ -38,10 +38,14 @@ export async function getPage(
   let buf: Buffer;
   try {
     buf = await extractor.page(comic.path, index);
+  } catch {
+    return null;
+  }
+  try {
     const normalized = await normalizeImage(buf);
     buf = normalized.data;
   } catch {
-    return null;
+    // fall back to original
   }
 
   if (opts.autoCrop) {
