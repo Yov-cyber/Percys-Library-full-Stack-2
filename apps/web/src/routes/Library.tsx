@@ -104,7 +104,8 @@ export function Library({ scope = "all" }: Props) {
     }
     try {
       const r = await upload(files);
-      const unreadable = Math.max(0, r.uploaded.length - r.added);
+      const registered = r.registered ?? r.added;
+      const unreadable = r.unreadable ?? Math.max(0, r.uploaded.length - registered);
       const noun = r.added === 1 ? "cómic" : "cómics";
       const head = `Importado${r.added === 1 ? "" : "s"} ${r.added} ${noun}`;
       const skippedTotal = r.skipped.length + unreadable;

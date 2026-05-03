@@ -234,9 +234,11 @@ libraryRouter.post(
     }
 
     const sources: { sourcePath: string; fmt: ComicFormat; files: Express.Multer.File[] }[] = [];
+    let unreadable = 0;
     for (const file of archives) {
       const fmt = detectFormat(file.path, false);
       if (!fmt) {
+        unreadable += 1;
         void fs.promises.unlink(file.path).catch(() => undefined);
         continue;
       }
@@ -254,21 +256,25 @@ libraryRouter.post(
     }
 
     let added = 0;
+    let registered = 0;
     const uploadedNames = new Set<string>();
     for (const source of sources) {
       try {
         const result = await registerComicPath(ownerId, source.sourcePath, source.fmt);
         if (result === "added") added += 1;
         if (result !== "skipped") {
+          registered += 1;
           for (const file of source.files) uploadedNames.add(file.originalname);
         }
         if (result === "skipped") {
+          unreadable += 1;
           void fs.promises.rm(source.sourcePath, { recursive: true, force: true }).catch(() => undefined);
         }
       } catch (err) {
         // Best-effort: skip the file but keep going so one bad upload
         // doesn't sink the whole batch.
         console.error("Failed to register uploaded comic", source.sourcePath, err);
+        unreadable += 1;
         void fs.promises.rm(source.sourcePath, { recursive: true, force: true }).catch(() => undefined);
       }
     }
@@ -279,6 +285,8 @@ libraryRouter.post(
         .map((f) => ({ name: f.originalname, size: f.size })),
       skipped,
       added,
+      registered,
+      unreadable,
       removed: 0,
       total,
     });

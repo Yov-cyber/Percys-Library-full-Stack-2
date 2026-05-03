@@ -201,6 +201,8 @@ export const api = {
         uploaded: { name: string; size: number }[];
         skipped: { name: string; reason: "already-exists" | "duplicated-in-batch" }[];
         added: number;
+        registered?: number;
+        unreadable?: number;
         removed: number;
         total: number;
       }>;
