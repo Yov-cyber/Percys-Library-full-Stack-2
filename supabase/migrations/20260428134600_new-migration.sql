@@ -1,0 +1,2 @@
+-- Placeholder migration created by agent.
+-- Add SQL statements here for future schema changes.

@@ -1,0 +1,128 @@
+// Percy's Library — Prisma schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Comic {
+  id           String   @id @default(cuid())
+  ownerId      String   @default("default")
+  path         String
+  title        String
+  format       String
+  pageCount    Int      @default(0)
+  sizeBytes    BigInt   @default(0)
+  addedAt      DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  category     String?
+  isFavorite   Boolean  @default(false)
+  coverPath    String?
+  // Reading progress
+  currentPage  Int      @default(0)
+  completed    Boolean  @default(false)
+  lastReadAt   DateTime?
+  // Last zoom factor the user applied to this comic. Persisted so that
+  // re-opening the comic restores their preferred zoom without affecting
+  // global settings or other comics.
+  lastZoom     Float?
+  bookmarks    Bookmark[]
+
+  @@index([lastReadAt])
+  @@index([addedAt])
+  @@index([title])
+  @@index([ownerId])
+  @@unique([ownerId, path])
+}
+
+model Settings {
+  ownerId        String  @id @default("default")
+  userName       String  @default("")
+  theme          String  @default("dark")
+  accentColor    String  @default("#7c5cff")
+  avatar         String? // either "preset:<id>" or a data:image/* base64 URL
+  coverSize      String  @default("md")
+  readingMode    String  @default("paged-h")
+  fitMode        String  @default("fit-width")
+  direction      String  @default("ltr")
+  showThumbStrip Boolean @default(true)
+  autoCropMargins Boolean @default(false)
+  uiHideDelayMs  Int     @default(2500)
+  autoAdvanceToNext Boolean @default(false)
+  autoScrollSpeed Int    @default(80) // pixels per second for webtoon/scroll-v
+  showTopProgress Boolean @default(true)
+  // Library
+  libraryView    String  @default("grid")  // "grid" | "list"
+  librarySort    String  @default("lastReadAt") // "title" | "lastReadAt" | "progress" | "addedAt"
+  // A11y + image processing
+  reduceMotion   Boolean @default(false)
+  imageFilter    String  @default("none") // "none" | "sepia" | "night" | "high-contrast"
+  libraryPath    String?
+  // Daily reading goal in pages. 0 means "no goal set" — the UI hides
+  // the goal ring when it's zero.
+  dailyGoalPages Int     @default(0)
+  customThemes   String  @default("[]") // JSON string of ThemePreset[]
+  keyboardShortcuts String @default("{}") // JSON string of user-custom keybinds
+  userLastName   String?
+  hasOnboarded   Boolean @default(false)
+  autoApplySettings Boolean @default(true)
+  animationsEnabled Boolean @default(true)
+  // Granular animation toggles (each independently disable-able even
+  // when animationsEnabled = true). Keeping these as plain booleans so
+  // the SQLite schema stays trivially queryable and we don't need a
+  // JSON shape for what is conceptually a flat dictionary.
+  animPageTransitions Boolean @default(true)
+  animHoverParallax   Boolean @default(true)
+  animHudFades        Boolean @default(true)
+  animMicroInteractions Boolean @default(true)
+  animBrandShimmer    Boolean @default(true)
+  animIntensity       Int     @default(100) // 0..100 — global speed/scale multiplier
+
+  // Reader layout (continuous / webtoon)
+  readerPageGap      Int     @default(8)    // px between pages
+  readerMaxWidth     Int     @default(900)  // max content width in px (0 = full)
+  readerSidePadding  Int     @default(0)    // px of inner side padding
+  readerPagePreload  Int     @default(3)    // pages to preload around current
+  imageQuality       String  @default("balanced") // "high" | "balanced" | "fast"
+
+  // Advanced personalisation
+  customCss          String  @default("")   // raw CSS appended to runtime stylesheet
+  backgroundImage    String?                // data: URL or remote URL for app background
+  backgroundDim      Int     @default(60)   // 0..100 dim overlay strength
+  fontScale          Int     @default(100)  // 80..130 — base font scale percent
+
+  // Stats UI prefs
+  statsRange         String  @default("30d") // "7d" | "30d" | "90d" | "1y" | "all"
+}
+
+model Bookmark {
+  id        String   @id @default(cuid())
+  ownerId   String   @default("default")
+  comicId   String
+  // Cascade so bookmarks vanish when their comic is removed by the
+  // library scan (or any other deletion path).
+  comic     Comic    @relation(fields: [comicId], references: [id], onDelete: Cascade)
+  page      Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([comicId])
+  @@index([ownerId])
+}
+
+model Achievement {
+  ownerId    String  @default("default")
+  id         String
+  unlockedAt DateTime @default(now())
+  @@id([ownerId, id])
+}
+
+model ReadingDay {
+  ownerId    String  @default("default")
+  date       String // ISO date "YYYY-MM-DD"
+  pagesRead  Int     @default(0)
+  @@id([ownerId, date])
+}
