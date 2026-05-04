@@ -93,7 +93,7 @@ export function CoverCard({
       <img
         src={coverUrl}
         alt={comic.title}
-        loading="eager"
+        loading="lazy"
         decoding="async"
         className={clsx(
           "h-full w-full object-cover transition-opacity duration-300",

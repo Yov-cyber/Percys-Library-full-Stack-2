@@ -79,7 +79,7 @@ export async function getCover(comicId: string): Promise<Buffer | null> {
     result = await makeThumbnail(raw, config.coverWidth);
   } catch {
     if (detectMime(raw) === "application/octet-stream") return null;
-    result = raw;
+    return raw;
   }
   await cache.writeDisk("covers", cache.coverKey(comicId), result);
   await cache.pruneBucket("covers", 500 * 1024 * 1024);
