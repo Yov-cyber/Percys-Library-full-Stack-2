@@ -8,11 +8,22 @@ async function getFolder(dir: string) {
   const cached = archiveCache.get(dir);
   if (cached) return cached;
 
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  const names = entries
-    .filter((e) => e.isFile() && isImageName(e.name))
-    .map((e) => e.name)
-    .sort(naturalCompare);
+  const names: string[] = [];
+  async function walk(current: string, prefix = "") {
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name === "__MACOSX") continue;
+      const rel = prefix ? path.join(prefix, entry.name) : entry.name;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full, rel);
+      } else if (entry.isFile() && isImageName(entry.name)) {
+        names.push(rel);
+      }
+    }
+  }
+  await walk(dir);
+  names.sort(naturalCompare);
   
   archiveCache.set(dir, names);
   return names;

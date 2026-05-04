@@ -1,6 +1,25 @@
 import { create } from "zustand";
 import { api, type SettingsDto } from "../lib/api";
 
+const CACHE_KEY = "pl_settings_snapshot_v1";
+
+function readCachedSettings(): SettingsDto | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    return raw ? (JSON.parse(raw) as SettingsDto) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheSettings(settings: SettingsDto) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(settings));
+  } catch {
+    // ignore storage quota/private mode failures
+  }
+}
+
 interface SettingsState {
   settings: SettingsDto | null;
   /** Last error from a load() call, surfaced to the UI so we don't get
@@ -11,11 +30,12 @@ interface SettingsState {
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  settings: null,
+  settings: readCachedSettings(),
   error: null,
   async load() {
     try {
       const settings = await api.settings();
+      cacheSettings(settings);
       set({ settings, error: null });
     } catch (err) {
       const message = err instanceof Error ? err.message : "No se pudo cargar la configuración";
@@ -31,10 +51,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     if (current) set({ settings: { ...current, ...patch } });
     try {
       const updated = await api.updateSettings(patch);
+      cacheSettings(updated);
       set({ settings: updated, error: null });
     } catch (err) {
       // Roll back the optimistic patch and re-fetch to recover canonical state.
-      if (current) set({ settings: current });
+      if (current) {
+        cacheSettings(current);
+        set({ settings: current });
+      }
       const message = err instanceof Error ? err.message : "No se pudieron guardar los cambios";
       set({ error: message });
       throw err;

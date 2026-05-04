@@ -11,7 +11,7 @@ async function getZipMetadata(filePath: string) {
   const zip = new AdmZip(filePath);
   const entries = zip
     .getEntries()
-    .filter((e) => !e.isDirectory && isImageName(e.entryName))
+    .filter((e) => !e.isDirectory && !e.entryName.startsWith("__MACOSX/") && isImageName(e.entryName))
     .sort((a, b) => naturalCompare(a.entryName, b.entryName))
     .map(e => ({ entryName: e.entryName }));
   

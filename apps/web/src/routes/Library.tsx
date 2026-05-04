@@ -9,6 +9,7 @@ import { Avatar } from "../components/AvatarPresets";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 
 const ACCEPTED_EXTENSIONS = [".cbz", ".cbr", ".pdf", ".zip", ".rar"] as const;
+const ACCEPTED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif", ".heic", ".heif", ".tif", ".tiff"] as const;
 const RETURNING_BANNER_KEY_PREFIX = "pl_returning_banner_seen_";
 
 function greeting(name: string): string {
@@ -91,18 +92,20 @@ export function Library({ scope = "all" }: Props) {
     const arr = Array.from(list);
     return arr.filter((f) => {
       const lower = f.name.toLowerCase();
-      return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext));
+      return ACCEPTED_EXTENSIONS.some((ext) => lower.endsWith(ext)) ||
+        ACCEPTED_IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
     });
   }
 
   const handleUpload = useCallback(async (files: File[]) => {
     if (files.length === 0) {
-      push("No se reconocieron archivos compatibles (.cbz, .cbr, .pdf, .zip, .rar)", "error");
+      push("No se reconocieron archivos compatibles (.cbz, .cbr, .pdf, .zip, .rar o imágenes)", "error");
       return;
     }
     try {
       const r = await upload(files);
-      const unreadable = Math.max(0, r.uploaded.length - r.added);
+      const registered = r.registered ?? r.added;
+      const unreadable = r.unreadable ?? Math.max(0, r.uploaded.length - registered);
       const noun = r.added === 1 ? "cómic" : "cómics";
       const head = `Importado${r.added === 1 ? "" : "s"} ${r.added} ${noun}`;
       const skippedTotal = r.skipped.length + unreadable;
@@ -364,6 +367,7 @@ export function Library({ scope = "all" }: Props) {
             ref={folderInputRef}
             type="file"
             multiple
+            accept=".cbz,.cbr,.pdf,.zip,.rar,.jpg,.jpeg,.png,.webp,.gif,.bmp,.avif,.heic,.heif,.tif,.tiff,application/pdf,image/*"
             className="sr-only"
             onChange={(e) => {
               const files = acceptedFiles(e.target.files);
@@ -406,7 +410,7 @@ export function Library({ scope = "all" }: Props) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className="font-semibold">Bienvenido de vuelta, {userName}</div>
-              <div className="text-xs text-blue-100/80">Puedes volver a la bienvenida desde Configuración → Perfil.</div>
+              <div className="text-xs text-blue-100/80">Tu perfil y biblioteca se conservarán durante la navegación.</div>
             </div>
             <button
               type="button"

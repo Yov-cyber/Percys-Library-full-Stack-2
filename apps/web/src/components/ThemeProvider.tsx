@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useSettingsStore } from "../stores/settings";
-import { getTheme, type ThemePreset } from "../lib/themes";
+import { getTheme, THEMES, type ThemePreset } from "../lib/themes";
 
 /**
  * Applies the active theme + accent colour to the document root.
@@ -129,7 +129,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function applyTheme(theme: ThemePreset, accent: string) {
+export function applyTheme(theme: ThemePreset, accent: string) {
   const root = document.documentElement;
   root.setAttribute("data-theme", theme.id);
   root.setAttribute("data-theme-dark", theme.dark ? "1" : "0");
@@ -299,4 +299,37 @@ function rgba(hex: string, alpha: number): string {
   const g = (num >> 8) & 0xff;
   const b = num & 0xff;
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+export function applyCachedTheme() {
+  try {
+    const raw = localStorage.getItem("pl_settings_snapshot_v1");
+    if (!raw) return;
+    const settings = JSON.parse(raw) as {
+      theme?: string;
+      accentColor?: string;
+      customThemes?: string;
+      animationsEnabled?: boolean;
+      reduceMotion?: boolean;
+      fontScale?: number;
+    };
+    let customThemes: ThemePreset[] = [];
+    try {
+      customThemes = JSON.parse(settings.customThemes || "[]");
+    } catch {
+      customThemes = [];
+    }
+    const theme =
+      customThemes.find((t) => t.id === settings.theme) ??
+      THEMES.find((t) => t.id === settings.theme) ??
+      getTheme("dark");
+    applyTheme(theme, settings.accentColor ?? theme.accent);
+    const root = document.documentElement;
+    root.setAttribute("data-anim", (settings.animationsEnabled ?? true) ? "1" : "0");
+    root.setAttribute("data-reduce-motion", settings.reduceMotion ? "1" : "0");
+    const fontScale = Math.max(80, Math.min(130, settings.fontScale ?? 100));
+    root.style.setProperty("font-size", `${fontScale}%`);
+  } catch {
+    // ignore invalid cached settings
+  }
 }

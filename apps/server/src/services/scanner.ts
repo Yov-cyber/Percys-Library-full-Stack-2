@@ -8,21 +8,37 @@ import { isImageName } from "../lib/natural-sort";
 async function isFolderComic(dir: string): Promise<boolean> {
   try {
     const entries = await fs.readdir(dir, { withFileTypes: true });
-    const imageCount = entries.filter((e) => e.isFile() && isImageName(e.name)).length;
-    return imageCount >= 1;
+    return entries.some((e) => e.isFile() && isImageName(e.name));
   } catch {
     return false;
   }
 }
 
+async function collectFolderImages(dir: string): Promise<string[]> {
+  const found: string[] = [];
+  async function walk(current: string) {
+    const entries = await fs.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.name.startsWith(".") || entry.name === "__MACOSX") continue;
+      const fullPath = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        await walk(fullPath);
+      } else if (entry.isFile() && isImageName(entry.name)) {
+        found.push(fullPath);
+      }
+    }
+  }
+  await walk(dir);
+  return found;
+}
+
 async function folderSizeBytes(dir: string): Promise<bigint> {
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
+    const entries = await collectFolderImages(dir);
     let total = 0n;
-    for (const e of entries) {
-      if (!e.isFile() || !isImageName(e.name)) continue;
+    for (const filePath of entries) {
       try {
-        const stat = await fs.stat(path.join(dir, e.name));
+        const stat = await fs.stat(filePath);
         total += BigInt(stat.size);
       } catch {
         // ignore individual file errors
@@ -69,9 +85,7 @@ export function scanLibrary(ownerId = "default"): Promise<ScanResult> {
 async function runScan(ownerId: string): Promise<ScanResult> {
   const root = config.libraryPath;
   await fs.mkdir(root, { recursive: true });
-  
-  // Scan BOTH the main library folder AND _uploads for new files
-  // _uploads is no longer excluded - we want to pick up newly uploaded files
+
   const seen = new Set<string>();
   let added = 0;
 
@@ -83,14 +97,14 @@ async function runScan(ownerId: string): Promise<ScanResult> {
         if (entry.isDirectory()) {
           const isFolder = await isFolderComic(fullPath);
           if (isFolder) {
-            if (await register(fullPath, "folder")) seen.add(fullPath);
+            await register(fullPath, "folder");
           } else {
             await walk(fullPath);
           }
         } else if (entry.isFile()) {
           const fmt = detectFormat(entry.name, false);
           if (fmt) {
-            if (await register(fullPath, fmt)) seen.add(fullPath);
+            await register(fullPath, fmt);
           }
         }
       } catch (err) {
@@ -99,20 +113,10 @@ async function runScan(ownerId: string): Promise<ScanResult> {
     }
   }
 
-  // Scan main library folder
-  await walk(root);
-  
-  // Also scan _uploads folder for any files that may have been uploaded
-  const uploadsDir = path.join(root, "_uploads");
-  try {
-    await walk(uploadsDir);
-  } catch {
-    // _uploads may not exist yet
-  }
-
   async function register(p: string, fmt: ComicFormat): Promise<boolean> {
     const result = await registerComicPath(ownerId, p, fmt);
     if (result === "added") added += 1;
+    if (result !== "skipped") seen.add(p);
     return result !== "skipped";
   }
 

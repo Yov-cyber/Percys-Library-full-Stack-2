@@ -616,12 +616,20 @@ export async function evaluateAchievements(ownerId = "default"): Promise<{ id: s
   const rows = (await prisma.achievement.findMany({ where: { ownerId } })) as Array<{ id: string }>;
   const existing = new Set<string>(rows.map((a: { id: string }) => a.id));
   const results: { id: string; unlocked: boolean }[] = [];
+  const unlocks: { ownerId: string; id: string }[] = [];
   for (const def of ACHIEVEMENTS) {
     const unlocked = def.check(ctx);
     if (unlocked && !existing.has(def.id)) {
-      await prisma.achievement.create({ data: { ownerId, id: def.id } });
+      unlocks.push({ ownerId, id: def.id });
     }
     results.push({ id: def.id, unlocked });
+  }
+  for (const unlock of unlocks) {
+    await prisma.achievement.upsert({
+      where: { ownerId_id: unlock },
+      update: {},
+      create: unlock,
+    });
   }
   return results;
 }

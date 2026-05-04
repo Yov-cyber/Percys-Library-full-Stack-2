@@ -8,6 +8,15 @@ export async function makeThumbnail(input: Buffer, width: number): Promise<Buffe
     .toBuffer();
 }
 
+export async function normalizeImage(input: Buffer): Promise<{ data: Buffer; mime: string }> {
+  const sourceMime = detectMime(input);
+  if (sourceMime !== "application/octet-stream") {
+    return { data: input, mime: sourceMime };
+  }
+  const data = await sharp(input).rotate().png().toBuffer();
+  return { data, mime: "image/png" };
+}
+
 export async function autoCropWhiteMargins(input: Buffer): Promise<Buffer> {
   return sharp(input).trim({ background: "white", threshold: 18 }).toBuffer();
 }
