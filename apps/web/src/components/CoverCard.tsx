@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ComicSummary } from "../lib/api";
 import { api } from "../lib/api";
@@ -32,6 +32,7 @@ export function CoverCard({
 }: Props) {
   const [coverState, setCoverState] = useState<"loading" | "ready" | "error">("loading");
   const [retry, setRetry] = useState(0);
+  const retryTimerRef = useRef<number | null>(null);
   const progress = comic.pageCount > 0 ? Math.round((comic.currentPage / Math.max(1, comic.pageCount - 1)) * 100) : 0;
   const coverUrl = `${api.coverUrl(comic.id)}?v=${encodeURIComponent(comic.updatedAt)}${retry > 0 ? `&retry=${retry}` : ""}`;
   const titleInitials = useMemo(
@@ -47,8 +48,18 @@ export function CoverCard({
   );
 
   useEffect(() => {
+    if (retryTimerRef.current !== null) {
+      window.clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     setCoverState("loading");
     setRetry(0);
+    return () => {
+      if (retryTimerRef.current !== null) {
+        window.clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
   }, [comic.id, comic.updatedAt]);
 
   const coverInner = (
@@ -84,7 +95,13 @@ export function CoverCard({
         )}
         onError={(e) => {
           if (retry < 2) {
-            window.setTimeout(() => setRetry((n) => n + 1), 350 * (retry + 1));
+            if (retryTimerRef.current !== null) {
+              window.clearTimeout(retryTimerRef.current);
+            }
+            retryTimerRef.current = window.setTimeout(() => {
+              retryTimerRef.current = null;
+              setRetry((n) => n + 1);
+            }, 350 * (retry + 1));
             return;
           }
           (e.currentTarget as HTMLImageElement).removeAttribute("src");
@@ -92,6 +109,10 @@ export function CoverCard({
         }}
         onLoad={(e) => {
           if ((e.currentTarget as HTMLImageElement).naturalWidth > 0) {
+            if (retryTimerRef.current !== null) {
+              window.clearTimeout(retryTimerRef.current);
+              retryTimerRef.current = null;
+            }
             setCoverState("ready");
           }
         }}
