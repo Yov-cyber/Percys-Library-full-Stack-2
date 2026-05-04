@@ -75,7 +75,10 @@ export function Avatar({ value, size = 40, className, fallbackText }: AvatarProp
     if (text) {
       return (
         <div
-          className={clsx("rounded-full grid place-items-center bg-blue-600 text-white font-black", className)}
+          className={clsx(
+            "grid place-items-center rounded-full bg-gradient-to-br from-accent to-blue-600 text-white font-black shadow-inner",
+            className,
+          )}
           style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.36)) }}
         >
           {text}

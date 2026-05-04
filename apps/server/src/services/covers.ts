@@ -5,7 +5,7 @@ import { config } from "../config";
 import { cache } from "./cache";
 import { getExtractor, type ComicFormat } from "./pipeline";
 import { folderExtractor } from "./extractors/folder";
-import { makeThumbnail, normalizeImage } from "../lib/image-utils";
+import { detectMime, makeThumbnail, normalizeImage } from "../lib/image-utils";
 import { isImageName, naturalCompare } from "../lib/natural-sort";
 
 async function findFolderCover(dir: string): Promise<Buffer | null> {
@@ -37,8 +37,22 @@ async function normalizeCoverCandidate(buf: Buffer): Promise<Buffer | null> {
 }
 
 export async function getCover(comicId: string): Promise<Buffer | null> {
-  const cached = await cache.readDisk("covers", cache.coverKey(comicId));
+  const coverKey = cache.coverKey(comicId);
+  const rawKey = cache.coverRawKey(comicId);
+  const cached = await cache.readDisk("covers", coverKey);
   if (cached) return cached;
+
+  const cachedRaw = await cache.readDisk("covers", rawKey);
+  if (cachedRaw) {
+    try {
+      const thumb = await makeThumbnail(cachedRaw, config.coverWidth);
+      await cache.writeDisk("covers", coverKey, thumb);
+      await cache.pruneBucket("covers", 500 * 1024 * 1024);
+      return thumb;
+    } catch {
+      return cachedRaw;
+    }
+  }
 
   const comic = await prisma.comic.findUnique({ where: { id: comicId } });
   if (!comic) return null;
@@ -74,15 +88,18 @@ export async function getCover(comicId: string): Promise<Buffer | null> {
   }
   if (!raw) return null;
 
-  let thumb: Buffer;
+  let result: Buffer;
   try {
-    thumb = await makeThumbnail(raw, config.coverWidth);
+    result = await makeThumbnail(raw, config.coverWidth);
   } catch {
-    return null;
+    if (detectMime(raw) === "application/octet-stream") return null;
+    await cache.writeDisk("covers", rawKey, raw);
+    await cache.pruneBucket("covers", 500 * 1024 * 1024);
+    return raw;
   }
-  await cache.writeDisk("covers", cache.coverKey(comicId), thumb);
+  await cache.writeDisk("covers", coverKey, result);
   await cache.pruneBucket("covers", 500 * 1024 * 1024);
-  return thumb;
+  return result;
 }
 
 // Re-export for tests / future use

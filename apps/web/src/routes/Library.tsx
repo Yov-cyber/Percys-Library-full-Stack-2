@@ -7,6 +7,7 @@ import { useToasts } from "../stores/toasts";
 import { CoverCard } from "../components/CoverCard";
 import { Avatar } from "../components/AvatarPresets";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { getDisplayName, getInitials } from "../lib/profile";
 
 const ACCEPTED_EXTENSIONS = [".cbz", ".cbr", ".pdf", ".zip", ".rar"] as const;
 const ACCEPTED_IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif", ".heic", ".heif", ".tif", ".tiff"] as const;
@@ -246,7 +247,7 @@ export function Library({ scope = "all" }: Props) {
       .slice(0, 8);
   }, [comics]);
 
-  const userName = (settings?.userName?.trim() || "Lector");
+  const userName = getDisplayName(settings?.userName, settings?.userLastName) || "Lector";
   const coverSize = settings?.coverSize ?? "md";
 
   const heroComic = continueReading[0] || recentlyAdded[0];
@@ -331,7 +332,7 @@ export function Library({ scope = "all" }: Props) {
     >
       <header className="flex items-center justify-between gap-4 px-8 pt-8 pb-6 relative z-10">
         <div className="flex items-center gap-4">
-          <Avatar value={settings?.avatar ?? null} size={56} className="rounded-2xl shadow-xl shadow-black/50 border border-white/5 shrink-0" fallbackText={`${settings?.userName?.[0] ?? ""}${settings?.userLastName?.[0] ?? ""}`} />
+          <Avatar value={settings?.avatar ?? null} size={56} className="rounded-2xl shadow-xl shadow-black/50 border border-white/5 shrink-0" fallbackText={getInitials(settings?.userName, settings?.userLastName)} />
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-white">{greeting(userName)}</h1>
             <p className="text-sm text-slate-400 font-medium mt-0.5">
@@ -573,13 +574,20 @@ export function Library({ scope = "all" }: Props) {
             </div>
             <h3 className="text-xl font-bold text-white mb-2">Tu biblioteca está vacía</h3>
             <p className="text-slate-500 max-w-xs mx-auto mb-8 font-medium">
-              Importa tus archivos CBZ, CBR o PDF para empezar tu aventura de lectura.
+              Importa archivos CBZ, CBR, PDF o carpetas de imágenes para empezar tu aventura de lectura.
             </p>
             <button
               onClick={() => fileInputRef.current?.click()}
               className="pl-btn-primary"
             >
               {uploading ? "Subiendo…" : "Elegir archivos"}
+            </button>
+            <button
+              onClick={() => folderInputRef.current?.click()}
+              className="mt-3 pl-btn"
+              disabled={uploading}
+            >
+              Importar carpeta de imágenes
             </button>
           </div>
         )}
@@ -755,7 +763,7 @@ function Lane({
           {subtitle && <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{subtitle}</p>}
         </div>
       </div>
-      <div className="flex gap-6 overflow-x-auto pb-6 -mx-8 px-8 no-scrollbar scroll-smooth">
+      <div className="grid grid-flow-col auto-cols-[140px] gap-6 overflow-x-auto pb-6 -mx-8 px-8 no-scrollbar scroll-smooth">
         {children}
       </div>
     </section>

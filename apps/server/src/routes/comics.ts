@@ -9,6 +9,7 @@ import { evaluateAchievements, recordReadingDay } from "../services/achievements
 import { asyncHandler } from "../lib/async-handler";
 import { naturalCompare } from "../lib/natural-sort";
 import { getOwnerId } from "../lib/owner";
+import { detectMime } from "../lib/image-utils";
 
 export const comicsRouter = Router();
 
@@ -197,7 +198,7 @@ comicsRouter.get(
   asyncHandler(async (req, res) => {
     const buf = await getCover(req.params.id);
     if (!buf) return res.status(404).end();
-    res.setHeader("Content-Type", "image/webp");
+    res.setHeader("Content-Type", detectMime(buf));
     res.setHeader("Cache-Control", "public, max-age=604800, stale-while-revalidate=86400");
     res.end(buf);
   }),
