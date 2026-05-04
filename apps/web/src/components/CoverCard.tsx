@@ -64,7 +64,13 @@ export function CoverCard({
 
   const coverInner = (
     <>
-      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-ink-800 via-ink-900 to-black p-4 text-center">
+      <div
+        className={clsx(
+          "absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-ink-800 via-ink-900 to-black p-4 text-center transition-opacity duration-300",
+          coverState === "ready" ? "opacity-0" : "opacity-100",
+        )}
+        aria-hidden={coverState === "ready"}
+      >
         <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] text-lg font-black text-white shadow-inner">
           {titleInitials}
         </div>
