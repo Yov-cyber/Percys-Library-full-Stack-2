@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import type { ComicSummary } from "../lib/api";
 import { api } from "../lib/api";
@@ -34,11 +34,32 @@ export function CoverCard({
   const [retry, setRetry] = useState(0);
   const progress = comic.pageCount > 0 ? Math.round((comic.currentPage / Math.max(1, comic.pageCount - 1)) * 100) : 0;
   const coverUrl = `${api.coverUrl(comic.id)}?v=${encodeURIComponent(comic.updatedAt)}${retry > 0 ? `&retry=${retry}` : ""}`;
+  const titleInitials = useMemo(
+    () =>
+      comic.title
+        .split(/[\s._-]+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => Array.from(part)[0] ?? "")
+        .join("")
+        .toUpperCase() || "PL",
+    [comic.title],
+  );
+
+  useEffect(() => {
+    setCoverState("loading");
+    setRetry(0);
+  }, [comic.id, comic.updatedAt]);
 
   const coverInner = (
     <>
-      <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
-        <span className="text-3xl">📚</span>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-ink-800 via-ink-900 to-black p-4 text-center">
+        <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] text-lg font-black text-white shadow-inner">
+          {titleInitials}
+        </div>
+        <div className="line-clamp-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+          {coverState === "error" ? "Portada no disponible" : "Cargando portada"}
+        </div>
       </div>
       {coverState !== "ready" && (
         <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] via-white/[0.02] to-transparent">
@@ -55,7 +76,7 @@ export function CoverCard({
       <img
         src={coverUrl}
         alt={comic.title}
-        loading="lazy"
+        loading="eager"
         decoding="async"
         className={clsx(
           "h-full w-full object-cover transition-opacity duration-300",
@@ -77,7 +98,9 @@ export function CoverCard({
       />
       {coverState === "error" && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-slate-950/70 p-4 text-center">
-          <div className="text-3xl">📚</div>
+          <div className="grid h-14 w-14 place-items-center rounded-2xl border border-white/10 bg-white/[0.06] text-lg font-black text-white">
+            {titleInitials}
+          </div>
           <div className="line-clamp-3 text-xs font-bold text-slate-200">{comic.title}</div>
         </div>
       )}
@@ -96,7 +119,7 @@ export function CoverCard({
           type="button"
           onClick={() => onToggleSelect?.(comic.id)}
           className={clsx(
-            "block aspect-[2/3] w-full overflow-hidden rounded-xl bg-slate-900 ring-1 transition-all duration-300 ease-out",
+            "relative block aspect-[2/3] w-full overflow-hidden rounded-xl bg-slate-900 ring-1 transition-all duration-300 ease-out",
             selected
               ? "ring-2 ring-blue-500 shadow-2xl shadow-blue-500/20 scale-[1.02]"
               : "ring-white/5 shadow-xl hover:ring-blue-500/40 hover:scale-[1.02] hover:-translate-y-1",
@@ -120,7 +143,7 @@ export function CoverCard({
       ) : (
         <Link
           to={`/read/${comic.id}`}
-          className="block aspect-[2/3] overflow-hidden rounded-xl bg-slate-900 ring-1 ring-white/5 shadow-xl transition-all duration-300 ease-out group-hover:scale-[1.03] group-hover:-translate-y-1 group-hover:ring-blue-500/40 group-hover:shadow-2xl group-hover:shadow-blue-500/10"
+          className="relative block aspect-[2/3] overflow-hidden rounded-xl bg-slate-900 ring-1 ring-white/5 shadow-xl transition-all duration-300 ease-out group-hover:scale-[1.03] group-hover:-translate-y-1 group-hover:ring-blue-500/40 group-hover:shadow-2xl group-hover:shadow-blue-500/10"
         >
           {coverInner}
         </Link>

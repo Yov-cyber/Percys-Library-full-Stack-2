@@ -6,6 +6,7 @@ import { useToasts } from "../stores/toasts";
 import { Avatar, AvatarPresetGrid } from "../components/AvatarPresets";
 import { THEMES } from "../lib/themes";
 import type { ReadingMode, SettingsDto } from "../lib/api";
+import { getDisplayName, getInitials } from "../lib/profile";
 
 const READING_MODES: { id: ReadingMode; label: string; hint: string }[] = [
   { id: "paged-h", label: "Paginado", hint: "Una página a la vez" },
@@ -85,8 +86,8 @@ export function Welcome() {
     () => THEMES.find((t) => t.id === themeId) ?? THEMES[0],
     [themeId],
   );
-  const initials = `${first[0] ?? ""}${last[0] ?? ""}`.toUpperCase();
-  const previewName = first.trim() || "Tu nombre";
+  const initials = getInitials(first, last);
+  const previewName = getDisplayName(first, last) || "Tu nombre";
 
   async function finish(skip = false) {
     if (saving) return;
@@ -288,7 +289,21 @@ export function Welcome() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Avatar</div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Avatar</div>
+                      <button
+                        type="button"
+                        className={clsx(
+                          "rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-wider transition-all",
+                          !avatar
+                            ? "border-violet-400/60 bg-violet-500/20 text-white"
+                            : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white",
+                        )}
+                        onClick={() => setAvatar(null)}
+                      >
+                        Iniciales automáticas
+                      </button>
+                    </div>
                     <AvatarPresetGrid value={avatar} onChange={setAvatar} />
                     <div className="flex flex-wrap items-center gap-2">
                       <button type="button" className="pl-btn text-xs" onClick={() => fileInputRef.current?.click()}>
@@ -296,10 +311,12 @@ export function Welcome() {
                       </button>
                       {avatar && (
                         <button type="button" className="pl-btn text-xs" onClick={() => setAvatar(null)}>
-                          Sin foto
+                          Usar iniciales
                         </button>
                       )}
-                      <span className="text-[9px] text-slate-500">PNG/JPG/WEBP · máx 250KB</span>
+                      <span className="text-[9px] text-slate-500">
+                        {initials ? `Vista: ${initials}` : "Se genera con nombre y apellido"} · PNG/JPG/WEBP · máx 250KB
+                      </span>
                     </div>
                     <input
                       ref={fileInputRef}

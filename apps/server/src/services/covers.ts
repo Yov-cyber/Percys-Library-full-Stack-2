@@ -5,7 +5,7 @@ import { config } from "../config";
 import { cache } from "./cache";
 import { getExtractor, type ComicFormat } from "./pipeline";
 import { folderExtractor } from "./extractors/folder";
-import { makeThumbnail, normalizeImage } from "../lib/image-utils";
+import { detectMime, makeThumbnail, normalizeImage } from "../lib/image-utils";
 import { isImageName, naturalCompare } from "../lib/natural-sort";
 
 async function findFolderCover(dir: string): Promise<Buffer | null> {
@@ -74,15 +74,17 @@ export async function getCover(comicId: string): Promise<Buffer | null> {
   }
   if (!raw) return null;
 
-  let thumb: Buffer;
   try {
-    thumb = await makeThumbnail(raw, config.coverWidth);
+    const thumb = await makeThumbnail(raw, config.coverWidth);
+    await cache.writeDisk("covers", cache.coverKey(comicId), thumb);
+    await cache.pruneBucket("covers", 500 * 1024 * 1024);
+    return thumb;
   } catch {
-    return null;
+    if (detectMime(raw) === "application/octet-stream") return null;
+    await cache.writeDisk("covers", cache.coverKey(comicId), raw);
+    await cache.pruneBucket("covers", 500 * 1024 * 1024);
+    return raw;
   }
-  await cache.writeDisk("covers", cache.coverKey(comicId), thumb);
-  await cache.pruneBucket("covers", 500 * 1024 * 1024);
-  return thumb;
 }
 
 // Re-export for tests / future use

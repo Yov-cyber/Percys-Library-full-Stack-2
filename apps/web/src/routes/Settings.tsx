@@ -7,6 +7,7 @@ import type { SettingsDto } from "../lib/api";
 import { Avatar, AvatarPresetGrid } from "../components/AvatarPresets";
 import { ThemePicker } from "../components/ThemePicker";
 import { THEMES, type ThemePreset } from "../lib/themes";
+import { getInitials } from "../lib/profile";
 import {
   DEFAULT_SHORTCUTS,
   formatShortcutKey,
@@ -388,9 +389,21 @@ export function Settings() {
                       value={settingsView.avatar}
                       size={80}
                       className="rounded-2xl shadow-2xl border border-white/10"
-                      fallbackText={`${settingsView.userName?.[0] ?? ""}${settingsView.userLastName?.[0] ?? ""}`}
+                      fallbackText={getInitials(settingsView.userName, settingsView.userLastName)}
                     />
                     <div className="flex-1 space-y-4">
+                      <button
+                        type="button"
+                        onClick={() => patch("avatar", null)}
+                        className={clsx(
+                          "rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider transition-all",
+                          !settingsView.avatar
+                            ? "border-blue-400/60 bg-blue-500/20 text-white"
+                            : "border-white/10 bg-white/[0.03] text-slate-400 hover:text-white",
+                        )}
+                      >
+                        Iniciales automáticas
+                      </button>
                       <AvatarPresetGrid
                         value={settingsView.avatar}
                         onChange={(v) => patch("avatar", v)}
@@ -1607,7 +1620,7 @@ function Toggle({
       aria-checked={value}
       onClick={() => onChange(!value)}
       className={clsx(
-        "relative inline-flex h-9 w-44 items-center rounded-full border transition-all",
+        "relative inline-grid h-10 w-56 grid-cols-2 items-center overflow-hidden rounded-full border p-1 transition-all",
         value
           ? "bg-blue-600/20 border-blue-500/50"
           : "bg-white/5 border-white/10",
@@ -1615,7 +1628,7 @@ function Toggle({
     >
       <span
         className={clsx(
-          "absolute inset-y-1 w-1/2 rounded-full transition-transform shadow-lg",
+          "absolute left-1 top-1 h-[calc(100%-0.5rem)] w-[calc(50%-0.25rem)] rounded-full transition-transform shadow-lg",
           value
             ? "translate-x-full bg-blue-600"
             : "translate-x-0 bg-slate-600",
@@ -1623,7 +1636,7 @@ function Toggle({
       />
       <span
         className={clsx(
-          "relative z-10 flex-1 text-xs font-black uppercase tracking-wider transition-colors",
+          "relative z-10 min-w-0 px-3 text-center text-[10px] font-black uppercase tracking-wide transition-colors",
           !value ? "text-white" : "text-slate-500",
         )}
       >
@@ -1631,7 +1644,7 @@ function Toggle({
       </span>
       <span
         className={clsx(
-          "relative z-10 flex-1 text-xs font-black uppercase tracking-wider transition-colors",
+          "relative z-10 min-w-0 px-3 text-center text-[10px] font-black uppercase tracking-wide transition-colors",
           value ? "text-white" : "text-slate-500",
         )}
       >
