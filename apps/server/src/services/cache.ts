@@ -48,6 +48,10 @@ export const cache = {
     return `${hashKey([comicId, "cover"])}.webp`;
   },
 
+  coverRawKey(comicId: string): string {
+    return `${hashKey([comicId, "cover", "raw"])}.bin`;
+  },
+
   async pruneBucket(bucket: string, maxBytes: number) {
     const dir = path.join(config.cacheDir, bucket);
     let entries: { name: string; size: number; atime: number }[] = [];

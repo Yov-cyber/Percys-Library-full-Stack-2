@@ -37,8 +37,22 @@ async function normalizeCoverCandidate(buf: Buffer): Promise<Buffer | null> {
 }
 
 export async function getCover(comicId: string): Promise<Buffer | null> {
-  const cached = await cache.readDisk("covers", cache.coverKey(comicId));
+  const coverKey = cache.coverKey(comicId);
+  const rawKey = cache.coverRawKey(comicId);
+  const cached = await cache.readDisk("covers", coverKey);
   if (cached) return cached;
+
+  const cachedRaw = await cache.readDisk("covers", rawKey);
+  if (cachedRaw) {
+    try {
+      const thumb = await makeThumbnail(cachedRaw, config.coverWidth);
+      await cache.writeDisk("covers", coverKey, thumb);
+      await cache.pruneBucket("covers", 500 * 1024 * 1024);
+      return thumb;
+    } catch {
+      return cachedRaw;
+    }
+  }
 
   const comic = await prisma.comic.findUnique({ where: { id: comicId } });
   if (!comic) return null;
@@ -79,9 +93,11 @@ export async function getCover(comicId: string): Promise<Buffer | null> {
     result = await makeThumbnail(raw, config.coverWidth);
   } catch {
     if (detectMime(raw) === "application/octet-stream") return null;
+    await cache.writeDisk("covers", rawKey, raw);
+    await cache.pruneBucket("covers", 500 * 1024 * 1024);
     return raw;
   }
-  await cache.writeDisk("covers", cache.coverKey(comicId), result);
+  await cache.writeDisk("covers", coverKey, result);
   await cache.pruneBucket("covers", 500 * 1024 * 1024);
   return result;
 }
